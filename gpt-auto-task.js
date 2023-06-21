@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.5
+// @version           0.0.6
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -162,6 +162,16 @@
 
         validate(innerHTML) {
             const buttons = document.querySelectorAll("form div button.btn-neutral");
+            const errorBtn = document.querySelectorAll("form div button.btn-primary");
+            if (errorBtn[0] && innerHTML.includes("wrong")) {
+                if (this.retrying) {
+                    this.retrying = false;
+                    return true;
+                }
+                errorBtn[0].click();
+                this.retrying = true;
+                return false;
+            }
             if (!innerHTML.includes("</code>")) {
                 if (this.retrying) {
                     this.retrying = false;
