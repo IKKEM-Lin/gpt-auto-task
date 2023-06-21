@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.4
+// @version           0.0.5
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -16,7 +16,8 @@
         checkInterval = 10000;
         account = "";
         downloadBtn = null;
-
+        retrying = false;
+ 
         constructor(account) {
             this.responds = JSON.parse(
                 localStorage.getItem("reaction_responds") || "[]"
@@ -32,7 +33,7 @@
             document.body.appendChild(btnWrap);
             this.main();
         }
-
+ 
         handleDownload() {
             const respond = JSON.parse(
                 localStorage.getItem("reaction_responds") || "[]"
@@ -55,7 +56,7 @@
                 }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
             );
         }
-
+ 
         downloadFile(data, fileName) {
             const a = document.createElement("a");
             document.body.appendChild(a);
@@ -69,7 +70,7 @@
             a.click();
             window.URL.revokeObjectURL(url);
         }
-
+ 
         async report() {
             await fetch("https://gpt-hit.deno.dev/api/update", {
                 method: "POST",
@@ -82,13 +83,13 @@
                 console.error({ err });
             });
         }
-
+ 
         genPrompt(content) {
             return `${localStorage.getItem("mock_prompt")}
-
+ 
             ''' ${content} ''' `;
         }
-
+ 
         getTask() {
             this.report();
             if (this.downloadBtn) {
@@ -108,7 +109,7 @@
                 // console.log("result:", result);
             };
         }
-
+ 
         saveRespond(respond) {
             const { snippetId } = respond;
             this.responds.push(respond);
@@ -116,7 +117,7 @@
             localStorage.setItem("task_queue", JSON.stringify(this.queue));
             localStorage.setItem("reaction_responds", JSON.stringify(this.responds));
         }
-
+ 
         sleep(duration) {
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
@@ -124,7 +125,7 @@
                 }, duration);
             });
         }
-
+ 
         trigger(prompt, checkInterval = this.checkInterval) {
             return new Promise((resolve, reject) => {
                 const textEl = document.querySelector("#prompt-textarea");
@@ -133,7 +134,7 @@
                 textEl.dispatchEvent(new Event("input", { bubbles: true }));
                 setTimeout(() => {
                     submitEl.click();
-
+ 
                     let resCache = null;
                     (async () => {
                         while (true) {
@@ -145,8 +146,11 @@
                             }
                             if (resCache === temp.innerHTML) {
                                 // console.log("匹配，resCache:", resCache);
-                                resolve(resCache);
-                                break;
+                                if (this.validate(resCache)) {
+                                    resolve(resCache);
+                                    break;
+                                }
+                                continue;
                             }
                             resCache = temp.innerHTML;
                             console.log(`${checkInterval / 1000}s后再次检查结果`);
@@ -156,6 +160,26 @@
             });
         }
 
+        validate(innerHTML) {
+            const buttons = document.querySelectorAll("form div button.btn-neutral");
+            if (!innerHTML.includes("</code>")) {
+                if (this.retrying) {
+                    this.retrying = false;
+                    return true;
+                }
+                console.error("未输出yaml结构，重试一次")
+                buttons[0].click();
+                this.retrying = true;
+                return false;
+            }
+            this.retrying = false;
+            if (buttons.length > 1) {
+                buttons[buttons.length - 1].click();
+                return false;
+            }
+            return true;
+        }
+ 
         async main(sleepTime = 5000) {
             while (true) {
                 // {0: gpt-3.5, 1: gpt-4, 2: gpt-4 mobile}
@@ -170,7 +194,7 @@
                     await this.sleep(5 * 60 * 1000);
                     continue;
                 }
-
+ 
                 const result = await task();
                 this.saveRespond(result);
                 console.log(`${sleepTime / 1000}s后将再次触发`);
@@ -180,7 +204,7 @@
             }
         }
     }
-
+ 
     function start() {
         const nameEl = document.querySelector(
             "nav > div:last-child > div:last-child"
@@ -195,5 +219,5 @@
         }
     }
     start();
-
+ 
 })();
