@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.6
+// @version           0.0.7
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -104,7 +104,12 @@
                 const { article_id, id, content } = task;
                 console.log(`开始触发 ${article_id}-${id}, ${new Date().toTimeString()}`);
                 const prompt = this.genPrompt(content);
-                const result = await this.trigger(prompt);
+                const result = await this.trigger(prompt).catch((err) => {
+                    return null
+                });
+                if (!result) {
+                    return null;
+                }
                 return { articleId: article_id, snippetId: id, reaction: result };
                 // console.log("result:", result);
             };
@@ -146,11 +151,18 @@
                             }
                             if (resCache === temp.innerHTML) {
                                 // console.log("匹配，resCache:", resCache);
-                                if (this.validate(resCache)) {
+                                const validateResult = await this.validate(resCache).catch(err => {
+                                    reject(null);
+                                    return;
+                                })
+                                if (validateResult === true) {
                                     resolve(resCache);
                                     break;
+                                } else if (validateResult === false) {
+                                    continue;
                                 }
-                                continue;
+                                reject(null);
+                                break;
                             }
                             resCache = temp.innerHTML;
                             console.log(`${checkInterval / 1000}s后再次检查结果`);
@@ -160,9 +172,16 @@
             });
         }
 
-        validate(innerHTML) {
+        async validate(innerHTML) {
             const buttons = document.querySelectorAll("form div button.btn-neutral");
             const errorBtn = document.querySelectorAll("form div button.btn-primary");
+            // 如果触发gpt-4 3小时25次限制
+            if (!buttons[0] && !errorBtn[0] && innerHTML.includes("usage cap")) {
+                console.error("触发gpt-4 3小时25次限制,等待10min后重试")
+                await this.sleep(10 * 60 * 1000);
+                throw new Error("触发gpt-4 3小时25次限制");
+            }
+            // 如果openAI服务器报错未返回结果
             if (errorBtn[0] && innerHTML.includes("wrong")) {
                 if (this.retrying) {
                     this.retrying = false;
@@ -172,6 +191,7 @@
                 this.retrying = true;
                 return false;
             }
+            // 如果输出结果未包含code标签
             if (!innerHTML.includes("</code>")) {
                 if (this.retrying) {
                     this.retrying = false;
@@ -183,6 +203,7 @@
                 return false;
             }
             this.retrying = false;
+            // 如果还未完全输出
             if (buttons.length > 1) {
                 buttons[buttons.length - 1].click();
                 return false;
@@ -206,7 +227,9 @@
                 }
  
                 const result = await task();
-                this.saveRespond(result);
+                if (result) {
+                    this.saveRespond(result);
+                }
                 console.log(`${sleepTime / 1000}s后将再次触发`);
                 const newChatBtn = document.querySelector("nav>div.mb-1>a:first-child");
                 newChatBtn.click();
