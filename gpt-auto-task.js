@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.3
+// @version           0.0.4
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -158,6 +158,13 @@
 
         async main(sleepTime = 5000) {
             while (true) {
+                // {0: gpt-3.5, 1: gpt-4, 2: gpt-4 mobile}
+                const modelNum = localStorage.getItem("model_number") || 1;
+                const gpt4btn = document.querySelectorAll("ul > li > button.cursor-pointer")[modelNum];
+                if (gpt4btn) {
+                    gpt4btn.firstChild.click()
+                }
+                await this.sleep(sleepTime/2);
                 const task = this.getTask();
                 if (!task) {
                     await this.sleep(5 * 60 * 1000);
@@ -169,7 +176,7 @@
                 console.log(`${sleepTime / 1000}s后将再次触发`);
                 const newChatBtn = document.querySelector("nav>div.mb-1>a:first-child");
                 newChatBtn.click();
-                await this.sleep(sleepTime);
+                await this.sleep(sleepTime/2);
             }
         }
     }
