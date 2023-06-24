@@ -2,9 +2,9 @@
 // @namespace         https://greasyfork.org/zh-CN/users/1106595-ikkem-lin
 // @name              GPT Auto task
 // @author            Mark
-// @description       自动在网页上与chat gpt对话
+// @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.8
+// @version           0.0.9
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -12,17 +12,20 @@
     "use strict";
     class GPT_ASK_LOOP {
         queue = [];
+        abstract = [];
         responds = [];
-        checkInterval = 10000;
+        checkInterval = 20000;
         account = "";
         downloadBtn = null;
         retrying = false;
+        defaultMode = 2;
  
         constructor(account) {
             this.responds = JSON.parse(
                 localStorage.getItem("reaction_responds") || "[]"
             );
             const queueCache = JSON.parse(localStorage.getItem("task_queue") || "[]");
+            this.abstract = JSON.parse(localStorage.getItem("task_abstract") || "[]");
             const resSnippetIds = this.responds.map((respond) => respond.snippetId);
             this.queue = queueCache.filter((item) => !resSnippetIds.includes(item.id));
             this.account = account || Math.ceil(Math.random() * 1e10).toString(32);
@@ -84,10 +87,10 @@
             });
         }
  
-        genPrompt(content) {
-            return `${localStorage.getItem("mock_prompt")}
+        genPrompt(content, step = 1) {
+            return step === 1 ? `${localStorage.getItem("mock_prompt"+step)}
  
-            ''' ${content} ''' `;
+            ''' ${content} ''' ` : localStorage.getItem("mock_prompt"+step);
         }
  
         getTask() {
@@ -102,15 +105,28 @@
             }
             return async () => {
                 const { article_id, id, content } = task;
+                const relatedAbstract = this.abstract.find((item) => item.article_id === article_id)?.content || "";
                 console.log(`开始触发 ${article_id}-${id}, ${new Date().toTimeString()}`);
-                const prompt = this.genPrompt(content);
-                const result = await this.trigger(prompt).catch((err) => {
+                const promptContent = `
+                ${relatedAbstract}
+
+                ${content}
+                `
+                const prompt1 = this.genPrompt(promptContent, 1);
+                const prompt2 = this.genPrompt(promptContent, 2);
+                const result1 = await this.trigger(prompt1).catch((err) => {
                     return null
                 });
-                if (!result) {
+                if (!result1) {
                     return null;
                 }
-                return { articleId: article_id, snippetId: id, reaction: result };
+                const result2 = await this.trigger(prompt2).catch((err) => {
+                    return null
+                });
+                if (!result2) {
+                    return null;
+                }
+                return { articleId: article_id, snippetId: id, reaction: result2 };
                 // console.log("result:", result);
             };
         }
@@ -171,7 +187,7 @@
                 }, 4000);
             });
         }
-
+ 
         async validate(innerHTML) {
             const buttons = document.querySelectorAll("form div button.btn-neutral");
             const errorBtn = document.querySelectorAll("form div button.btn-primary");
@@ -214,13 +230,15 @@
         async main(sleepTime = 5000) {
             while (true) {
                 // {0: gpt-3.5, 1: gpt-4, 2: gpt-4 mobile}
-                const modelNum = localStorage.getItem("model_number") || 1;
+                const modelNum = +localStorage.getItem("model_number") || this.defaultMode;
                 const gpt4btn = document.querySelectorAll("ul > li > button.cursor-pointer")[modelNum];
+                
+                console.log(`当前模型为：${gpt4btn.innerText}`);
                 if (gpt4btn) {
                     gpt4btn.firstChild.click()
                 }
                 await this.sleep(sleepTime/2);
-                if (!location.href.endsWith("gpt-4")) {
+                if (modelNum===1 && !location.href.endsWith("gpt-4")) {
                     console.log("未切换到gpt-4模式, 5分钟后重试");
                     await this.sleep(5 * 60 * 1000);
                     const newChatBtn = document.querySelector("nav>div.mb-1>a:first-child");
