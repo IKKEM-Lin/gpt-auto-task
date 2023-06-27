@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.10
+// @version           0.0.11
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -198,7 +198,7 @@
                 throw new Error("触发gpt-4 3小时25次限制");
             }
             // 如果openAI服务器报错未返回结果
-            if (errorBtn[0] && innerHTML.includes("wrong")) {
+            if (errorBtn[0]) { // && innerHTML.includes("wrong")) {
                 if (this.retrying) {
                     this.retrying = false;
                     return true;
