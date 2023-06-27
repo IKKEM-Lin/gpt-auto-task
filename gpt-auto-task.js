@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.12
+// @version           0.0.14
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -134,7 +134,7 @@
  
         saveRespond(respond) {
             const { snippetId } = respond;
-            this.responds.push(respond);
+            this.responds.push({...respond, createdTime: new Date().valueOf()});
             this.queue = this.queue.filter((item) => item.id !== snippetId);
             localStorage.setItem("task_queue", JSON.stringify(this.queue));
             localStorage.setItem("reaction_responds", JSON.stringify(this.responds));
@@ -241,6 +241,13 @@
                 await this.sleep(sleepTime/2);
                 if (modelNum===1 && !location.href.endsWith("gpt-4")) {
                     console.log("未切换到gpt-4模式, 5分钟后重试");
+                    const maxTime = Math.max.apply(null, this.responds.map(item => item.createdTime).filter(item => item).push(0))
+                    const diff = new Date().valueOf() - maxTime;
+                    if (maxTime && diff > 1.5 * 60 * 60 * 1000) {
+                        location.reload();
+                        break;
+                    }
+                    this.report(`触发gpt-4 3小时25次限制，上次运行时间：${new Date(maxTime).toLocaleString()}`);
                     await this.sleep(5 * 60 * 1000);
                     const newChatBtn = document.querySelector("nav>div.mb-1>a:first-child");
                     newChatBtn.click();
