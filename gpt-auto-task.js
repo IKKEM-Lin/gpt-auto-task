@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.11
+// @version           0.0.12
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -74,13 +74,14 @@
             window.URL.revokeObjectURL(url);
         }
  
-        async report() {
+        async report(tip = "") {
             await fetch("https://gpt-hit.deno.dev/api/update", {
                 method: "POST",
                 body: JSON.stringify({
                     account: this.account,
                     reaction_count: this.responds.length,
                     queue_count: this.queue.length,
+                    tip: tip,
                 }),
             }).catch((err) => {
                 console.error({ err });
@@ -94,11 +95,11 @@
         }
  
         getTask() {
-            this.report();
             if (this.downloadBtn) {
                 this.downloadBtn.innerText = `下载已生成结果（queue: ${this.queue.length}, res: ${this.responds.length}）`;
             }
             const task = this.queue[0];
+            this.report(task && `Working on articleId: ${task.article_id}, snippetId: ${task.id}` || "");
             if (!task) {
                 console.log("任务队列为空");
                 return;
