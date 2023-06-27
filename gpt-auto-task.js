@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.14
+// @version           0.0.15
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -73,6 +73,29 @@
             a.click();
             window.URL.revokeObjectURL(url);
         }
+
+        autoBackup() {
+            const respond = JSON.parse(
+                localStorage.getItem("reaction_responds") || "[]"
+            );
+            if (!respond.length) {
+                return;
+            }
+            const result = respond.map((item) => {
+                const ele = document.createElement("div");
+                ele.innerHTML = item.reaction;
+                const res = Array.from(ele.querySelectorAll("code")).map(
+                    (el) => el.innerText
+                );
+                return { ...item, reaction: res };
+            });
+            const blob = new Blob([JSON.stringify(result)], {
+                type: "application/octet-stream",
+            });
+            const url = window.URL.createObjectURL(blob);
+            window.open(url);
+            window.URL.revokeObjectURL(url);
+        }
  
         async report(tip = "") {
             await fetch("https://gpt-hit.deno.dev/api/update", {
@@ -138,6 +161,9 @@
             this.queue = this.queue.filter((item) => item.id !== snippetId);
             localStorage.setItem("task_queue", JSON.stringify(this.queue));
             localStorage.setItem("reaction_responds", JSON.stringify(this.responds));
+            if (this.responds.length && this.responds.length % 20 === 0) {
+                this.autoBackup()
+            }
         }
  
         sleep(duration) {
@@ -212,7 +238,8 @@
             if (!innerHTML.includes("</code>")) {
                 if (this.retrying) {
                     this.retrying = false;
-                    return true;
+                    console.error("第二次还是未输出yaml结构")
+                    throw new Error("未返回yaml结构")
                 }
                 console.error("未输出yaml结构，重试一次")
                 buttons[0].click();
