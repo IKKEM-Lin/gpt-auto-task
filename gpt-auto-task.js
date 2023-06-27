@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.15
+// @version           0.0.16
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -268,7 +268,7 @@
                 await this.sleep(sleepTime/2);
                 if (modelNum===1 && !location.href.endsWith("gpt-4")) {
                     console.log("未切换到gpt-4模式, 5分钟后重试");
-                    const maxTime = Math.max.apply(null, this.responds.map(item => item.createdTime).filter(item => item).push(0))
+                    const maxTime = Math.max.apply(null, this.responds.map(item => item.createdTime).filter(item => item).concat([0]))
                     const diff = new Date().valueOf() - maxTime;
                     if (maxTime && diff > 1.5 * 60 * 60 * 1000) {
                         location.reload();
