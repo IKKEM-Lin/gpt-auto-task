@@ -124,7 +124,7 @@
                     return null
                 });
                 if (!result2) {
-                    return null;
+                    return { articleId: article_id, snippetId: id, reaction: result1 };
                 }
                 return { articleId: article_id, snippetId: id, reaction: result2 };
                 // console.log("result:", result);
