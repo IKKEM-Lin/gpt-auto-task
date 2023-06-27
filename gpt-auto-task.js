@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.16
+// @version           0.0.17
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -19,7 +19,7 @@
         downloadBtn = null;
         retrying = false;
         defaultMode = 2;
- 
+
         constructor(account) {
             this.responds = JSON.parse(
                 localStorage.getItem("reaction_responds") || "[]"
@@ -36,7 +36,7 @@
             document.body.appendChild(btnWrap);
             this.main();
         }
- 
+
         handleDownload() {
             const respond = JSON.parse(
                 localStorage.getItem("reaction_responds") || "[]"
@@ -59,7 +59,7 @@
                 }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
             );
         }
- 
+
         downloadFile(data, fileName) {
             const a = document.createElement("a");
             document.body.appendChild(a);
@@ -96,7 +96,7 @@
             window.open(url);
             window.URL.revokeObjectURL(url);
         }
- 
+
         async report(tip = "") {
             await fetch("https://gpt-hit.deno.dev/api/update", {
                 method: "POST",
@@ -110,13 +110,13 @@
                 console.error({ err });
             });
         }
- 
+
         genPrompt(content, step = 1) {
             return step === 1 ? `${localStorage.getItem("mock_prompt"+step)}
- 
+
             ''' ${content} ''' ` : localStorage.getItem("mock_prompt"+step);
         }
- 
+
         getTask() {
             if (this.downloadBtn) {
                 this.downloadBtn.innerText = `下载已生成结果（queue: ${this.queue.length}, res: ${this.responds.length}）`;
@@ -154,7 +154,7 @@
                 // console.log("result:", result);
             };
         }
- 
+
         saveRespond(respond) {
             const { snippetId } = respond;
             this.responds.push({...respond, createdTime: new Date().valueOf()});
@@ -165,7 +165,7 @@
                 this.autoBackup()
             }
         }
- 
+
         sleep(duration) {
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
@@ -173,7 +173,7 @@
                 }, duration);
             });
         }
- 
+
         trigger(prompt, checkInterval = this.checkInterval) {
             return new Promise((resolve, reject) => {
                 const textEl = document.querySelector("#prompt-textarea");
@@ -182,7 +182,7 @@
                 textEl.dispatchEvent(new Event("input", { bubbles: true }));
                 setTimeout(() => {
                     submitEl.click();
- 
+
                     let resCache = null;
                     (async () => {
                         while (true) {
@@ -214,7 +214,7 @@
                 }, 4000);
             });
         }
- 
+
         async validate(innerHTML) {
             const buttons = document.querySelectorAll("form div button.btn-neutral");
             const errorBtn = document.querySelectorAll("form div button.btn-primary");
@@ -254,13 +254,13 @@
             }
             return true;
         }
- 
+
         async main(sleepTime = 5000) {
             while (true) {
                 // {0: gpt-3.5, 1: gpt-4, 2: gpt-4 mobile}
                 const modelNum = +localStorage.getItem("model_number") || this.defaultMode;
                 const gpt4btn = document.querySelectorAll("ul > li > button.cursor-pointer")[modelNum];
-                
+
                 console.log(`当前模型为：${gpt4btn.innerText}`);
                 if (gpt4btn) {
                     gpt4btn.firstChild.click()
@@ -271,6 +271,8 @@
                     const maxTime = Math.max.apply(null, this.responds.map(item => item.createdTime).filter(item => item).concat([0]))
                     const diff = new Date().valueOf() - maxTime;
                     if (maxTime && diff > 1.5 * 60 * 60 * 1000) {
+                        console.log("超时未刷新, 5分钟后刷新页面");
+                        await this.sleep(5 * 60 * 1000);
                         location.reload();
                         break;
                     }
@@ -285,7 +287,7 @@
                     await this.sleep(5 * 60 * 1000);
                     continue;
                 }
- 
+
                 const result = await task();
                 if (result) {
                     this.saveRespond(result);
@@ -297,7 +299,7 @@
             }
         }
     }
- 
+
     function start() {
         const nameEl = document.querySelector(
             "nav > div:last-child > div:last-child"
@@ -312,5 +314,5 @@
         }
     }
     start();
- 
+
 })();
