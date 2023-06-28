@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.18
+// @version           0.0.19
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -161,12 +161,19 @@
                     submitEl.click();
 
                     let resCache = null;
+                    let checkOutputCount = 0;
                     (async () => {
                         while (true) {
                             await this.sleep(checkInterval);
                             const result = Array.from(document.querySelectorAll("main .group"));
                             const temp = result[result.length - 1];
                             if (!temp) {
+                                if (checkOutputCount > 0) {
+                                    console.log("检查结果超时");
+                                    reject(null);
+                                    break;
+                                }
+                                checkOutputCount++;
                                 continue;
                             }
                             if (resCache === temp.innerHTML) {
