@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.20
+// @version           0.0.21
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -102,7 +102,7 @@
             this.report(task && `Working on articleId: ${task.article_id}, snippetId: ${task.id}` || "");
             if (!task) {
                 console.log("任务队列为空");
-                return;
+                return () => null;
             }
             return async () => {
                 const { article_id, id, content } = task;
@@ -240,6 +240,7 @@
         }
 
         async main(sleepTime = 5000) {
+            const emptyCount = 0;
             while (true) {
                 // {0: gpt-3.5, 1: gpt-4, 2: gpt-4 mobile}
                 const modelNum = +localStorage.getItem("model_number") || this.defaultMode;
@@ -268,6 +269,12 @@
                 }
                 const task = this.getTask();
                 if (!task) {
+                    if (emptyCount > 0) {
+                        console.log("连续两次未获取到任务，即将刷新");
+                        location.reload();
+                        break;
+                    }
+                    emptyCount++
                     await this.sleep(5 * 60 * 1000);
                     continue;
                 }
