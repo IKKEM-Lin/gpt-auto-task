@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.17
+// @version           0.0.18
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -74,29 +74,6 @@
             window.URL.revokeObjectURL(url);
         }
 
-        autoBackup() {
-            const respond = JSON.parse(
-                localStorage.getItem("reaction_responds") || "[]"
-            );
-            if (!respond.length) {
-                return;
-            }
-            const result = respond.map((item) => {
-                const ele = document.createElement("div");
-                ele.innerHTML = item.reaction;
-                const res = Array.from(ele.querySelectorAll("code")).map(
-                    (el) => el.innerText
-                );
-                return { ...item, reaction: res };
-            });
-            const blob = new Blob([JSON.stringify(result)], {
-                type: "application/octet-stream",
-            });
-            const url = window.URL.createObjectURL(blob);
-            window.open(url);
-            window.URL.revokeObjectURL(url);
-        }
-
         async report(tip = "") {
             await fetch("https://gpt-hit.deno.dev/api/update", {
                 method: "POST",
@@ -161,8 +138,8 @@
             this.queue = this.queue.filter((item) => item.id !== snippetId);
             localStorage.setItem("task_queue", JSON.stringify(this.queue));
             localStorage.setItem("reaction_responds", JSON.stringify(this.responds));
-            if (this.responds.length && this.responds.length % 20 === 0) {
-                this.autoBackup()
+            if (this.responds.length && ((this.responds.length % 10) === 0)) {
+                this.handleDownload.bind(this)()
             }
         }
 
@@ -300,6 +277,23 @@
         }
     }
 
+    function secondInterval() {
+        console.log("start secondInterval...")
+        setInterval(async () => {
+            const responds = JSON.parse(
+                localStorage.getItem("reaction_responds") || "[]"
+            );
+            const maxTime = Math.max.apply(null, responds.map(item => item.createdTime).filter(item => item).concat([0]))
+            const diff = new Date().valueOf() - maxTime;
+
+            console.log(`last updated at: ${maxTime}, diff is ${diff}`)
+            if (maxTime && (diff > 30 * 60 * 1000)) {
+                console.log("超时未刷新, 5分钟后刷新页面");
+                location.reload();
+            }
+        }, 10*60*1000)
+    }
+
     function start() {
         const nameEl = document.querySelector(
             "nav > div:last-child > div:last-child"
@@ -307,6 +301,7 @@
         const name = nameEl && nameEl.innerText;
         if (name) {
             new GPT_ASK_LOOP(name);
+            secondInterval();
         } else {
             setTimeout(() => {
                 start();
