@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.21
+// @version           0.0.22
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -121,6 +121,7 @@
                 if (!result1) {
                     return null;
                 }
+                await this.sleep(3 * 1000);
                 const result2 = await this.trigger(prompt2).catch((err) => {
                     return null
                 });
@@ -282,6 +283,14 @@
                 const result = await task();
                 if (result) {
                     this.saveRespond(result);
+                    emptyCount = 0
+                } else {
+                    if (emptyCount > 0) {
+                        console.log("连续两次未获取值");
+                        location.reload();
+                        break;
+                    }
+                    emptyCount++
                 }
                 console.log(`${sleepTime / 1000}s后将再次触发`);
                 const newChatBtn = document.querySelector("nav>div.mb-1>a:first-child");
