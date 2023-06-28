@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.19
+// @version           0.0.20
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -56,7 +56,7 @@
             this.downloadFile(
                 JSON.stringify(result),
                 `${now.getFullYear()}-${now.getMonth() + 1
-                }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
+                }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}-${result.length}.json`
             );
         }
 
