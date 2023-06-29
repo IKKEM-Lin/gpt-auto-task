@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的task_queue自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.0.23
+// @version           0.0.24
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // ==/UserScript==
@@ -247,9 +247,12 @@
                 const modelNum = +localStorage.getItem("model_number") || this.defaultMode;
                 const gpt4btn = document.querySelectorAll("ul > li > button.cursor-pointer")[modelNum];
 
-                console.log(`当前模型为：${gpt4btn.innerText}`);
                 if (gpt4btn) {
+                    console.log(`当前模型为：${gpt4btn.innerText}`);
                     gpt4btn.firstChild.click()
+                } else {
+                    await this.sleep(sleepTime/2);
+                    location.reload();
                 }
                 await this.sleep(sleepTime/2);
                 if (modelNum===1 && !location.href.endsWith("gpt-4")) {
