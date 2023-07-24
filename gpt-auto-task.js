@@ -5,7 +5,7 @@
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @description       "snippetSourceData", "mock_prompt1", "mock_prompt2", "model_number" 四个localStorage变量用于存储数据
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.2
+// @version           0.1.3
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -360,7 +360,7 @@
           dbTable.skipSnippet
         );
       } catch(err) {
-        
+
       }
       if (this.responds.length && this.responds.length % 50 === 0) {
         this.handleDownload.bind(this)();
@@ -545,6 +545,13 @@
 
   function secondInterval() {
     console.log("start secondInterval...");
+    const sleep = (duration) => {
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          resolve(true);
+        }, duration);
+      });
+    }
     setInterval(async () => {
       const responds = await idbKeyval.values(dbTable.responseProcessed);
       const maxTime = Math.max.apply(
@@ -559,7 +566,7 @@
       console.log(`last updated at: ${maxTime}, diff is ${diff}`);
       if (maxTime && diff > 30 * 60 * 1000) {
         console.warn("超时未刷新, 2分钟后刷新页面");
-        await this.sleep(2 * 60 * 1000);
+        await sleep(2 * 60 * 1000);
         location.reload();
       }
     }, 10 * 60 * 1000);
