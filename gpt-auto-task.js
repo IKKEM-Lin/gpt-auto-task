@@ -5,7 +5,7 @@
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @description       "snippetSourceData", "mock_prompt1", "mock_prompt2", "model_number" 四个localStorage变量用于存储数据
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.3
+// @version           0.1.4
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -132,6 +132,11 @@
         this.downloadBtn = btnWrap.querySelector("button");
         this.downloadBtn.onclick = this.handleDownload.bind(this);
         document.body.appendChild(btnWrap);
+        const btnWrapBackup = document.createElement("div");
+        btnWrapBackup.innerHTML = `<button style="padding: 4px 8px;position: fixed;bottom: 30%;right: 8px;border-radius: 4px;background-color: #224466;color: #fff;">备份</button>`;
+        const backupBtn = btnWrapBackup.querySelector("button");
+        backupBtn.onclick = this.backUp.bind(this);
+        document.body.appendChild(btnWrapBackup);
         this.main();
       });
     }
@@ -140,7 +145,11 @@
       const skipSnippetKeys = await idbKeyval.keys(dbTable.skipSnippet);
       const responseKeys = await idbKeyval.keys(dbTable.responseProcessed);
       const responseValues = await idbKeyval.values(dbTable.responseProcessed);
-      this.responds = responseValues.map(item => ({articleId: item.articleId, snippetId: item.snippetId, createdTime: item.createdTime}));
+      this.responds = responseValues.map((item) => ({
+        articleId: item.articleId,
+        snippetId: item.snippetId,
+        createdTime: item.createdTime,
+      }));
       const snippetSourceData = JSON.parse(
         localStorage.getItem("snippetSourceData") || "[]"
       );
@@ -152,14 +161,34 @@
       );
       this.queue = paragraphs.filter(
         (item) =>
-          !(responseKeys || []).includes(`${item.article_id}-${item.id}`) && !(skipSnippetKeys || []).includes(`${item.article_id}-${item.id}`)
+          !(responseKeys || []).includes(`${item.article_id}-${item.id}`) &&
+          !(skipSnippetKeys || []).includes(`${item.article_id}-${item.id}`)
       );
       if (this.queue.length !== 0) {
         return;
       }
-      this.queue = paragraphs.filter(
-        (item) =>
-          (skipSnippetKeys || []).includes(`${item.article_id}-${item.id}`)
+      this.queue = paragraphs.filter((item) =>
+        (skipSnippetKeys || []).includes(`${item.article_id}-${item.id}`)
+      );
+    }
+
+    async backUp() {
+      const response1 = await idbKeyval.entries(dbTable.response1);
+      const response2 = await idbKeyval.entries(dbTable.response2);
+      const responseProcessed = await idbKeyval.entries(dbTable.responseProcessed);
+
+      const now = new Date();
+      const current = `${now.getFullYear()}-${
+        now.getMonth() + 1
+      }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}`;
+      downloadFile(
+        JSON.stringify(response1), `backup-${current}-response1-${response1.length}.json`
+      );
+      downloadFile(
+        JSON.stringify(response2), `backup-${current}-response2-${response2.length}.json`
+      );
+      downloadFile(
+        JSON.stringify(responseProcessed), `backup-${current}-responseProcessed-${responseProcessed.length}.json`
       );
     }
 
@@ -320,7 +349,10 @@
     }
 
     async skipSnippetHandler(articleId, snippetId) {
-      const oldVal = await idbKeyval.get( `${articleId}-${snippetId}`, dbTable.skipSnippet);
+      const oldVal = await idbKeyval.get(
+        `${articleId}-${snippetId}`,
+        dbTable.skipSnippet
+      );
       await idbKeyval.set(
         `${articleId}-${snippetId}`,
         (oldVal || 0) + 1,
@@ -355,13 +387,8 @@
         dbTable.responseProcessed
       );
       try {
-        await idbKeyval.del(
-          `${articleId}-${snippetId}`,
-          dbTable.skipSnippet
-        );
-      } catch(err) {
-
-      }
+        await idbKeyval.del(`${articleId}-${snippetId}`, dbTable.skipSnippet);
+      } catch (err) {}
       if (this.responds.length && this.responds.length % 50 === 0) {
         this.handleDownload.bind(this)();
       }
@@ -526,7 +553,9 @@
           if (emptyCount > 0) {
             const task = this.queue[0];
             const { article_id, id } = task;
-            console.warn(`${article_id}-${id}连续两次未获取到任务值，2分钟后刷新`);
+            console.warn(
+              `${article_id}-${id}连续两次未获取到任务值，2分钟后刷新`
+            );
             await this.skipSnippetHandler(article_id, id);
             await this.sleep(2 * 60 * 1000);
             location.reload();
@@ -551,7 +580,7 @@
           resolve(true);
         }, duration);
       });
-    }
+    };
     setInterval(async () => {
       const responds = await idbKeyval.values(dbTable.responseProcessed);
       const maxTime = Math.max.apply(
