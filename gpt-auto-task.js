@@ -5,7 +5,7 @@
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @description       "snippetSourceData", "mock_prompt1", "mock_prompt2", "model_number" 四个localStorage变量用于存储数据
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.4
+// @version           0.1.5
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -111,7 +111,7 @@
 
     INPUT_SELECTOR = "#prompt-textarea";
     SUBMIT_BTN_SELECTOR = "#prompt-textarea + button";
-    RESPOND_SELECTOR = "main .group";
+    RESPOND_SELECTOR = "main .group.text-token-text-primary";
     NEW_CHART_BTN_SELECTOR = "nav>div.mb-1>a:first-child";
     NORMAL_RESPOND_BTN_SELECTOR = "form div button.btn-neutral";
     ERROR_RESPOND_BTN_SELECTOR = "form div button.btn-primary";
