@@ -5,7 +5,7 @@
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @description       "snippetSourceData", "mock_prompt1", "mock_prompt2", "model_number" 四个localStorage变量用于存储数据
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.5
+// @version           0.1.6
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -23,6 +23,10 @@
     response2: idbKeyval.createStore("response2", tableName),
     responseProcessed: idbKeyval.createStore("responseProcessed", tableName),
   };
+
+  const locationReload = () => {
+    location.href = "https://chat.openai.com/?model=gpt-4";
+  }
 
   const downloadFile = (data, fileName) => {
     const a = document.createElement("a");
@@ -507,17 +511,17 @@
         } else {
           console.warn(`无法选择模型，2分钟后刷新`);
           await this.sleep(2 * 60 * 1000);
-          location.reload();
+          locationReload();
         }
         await this.sleep(sleepTime / 2);
-        if (modelNum === 1 && !location.href.endsWith("gpt-4")) {
+        if (modelNum === 1 && !(location.href.endsWith("gpt-4") || gpt4btn.firstChild.className?.includes("shadow"))) {
           console.log("未切换到gpt-4模式, 5分钟后重试");
           const maxTime = this._getLastRespondTime();
           const diff = new Date().valueOf() - maxTime;
           if (maxTime && diff > 1.5 * 60 * 60 * 1000) {
             console.warn("超时未刷新, 5分钟后刷新页面");
             await this.sleep(5 * 60 * 1000);
-            location.reload();
+            locationReload();
             break;
           }
           this.report(
@@ -537,7 +541,7 @@
           if (emptyCount > 0) {
             console.warn("连续两次未获取到任务，2分钟后刷新");
             await this.sleep(2 * 60 * 1000);
-            location.reload();
+            locationReload();
             break;
           }
           emptyCount++;
@@ -558,7 +562,7 @@
             );
             await this.skipSnippetHandler(article_id, id);
             await this.sleep(2 * 60 * 1000);
-            location.reload();
+            locationReload();
             break;
           }
           emptyCount += 1;
@@ -596,7 +600,7 @@
       if (maxTime && diff > 30 * 60 * 1000) {
         console.warn("超时未刷新, 2分钟后刷新页面");
         await sleep(2 * 60 * 1000);
-        location.reload();
+        locationReload();
       }
     }, 10 * 60 * 1000);
   }
