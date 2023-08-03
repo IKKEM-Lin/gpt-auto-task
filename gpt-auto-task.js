@@ -5,7 +5,7 @@
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @description       "snippetSourceData", "mock_prompt1", "mock_prompt2", "model_number" 四个localStorage变量用于存储数据
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.6
+// @version           0.1.7
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -488,7 +488,7 @@
       }
       this.retrying = false;
       // 如果还未完全输出
-      if (buttons.length > 1) {
+      if (buttons.length > 1 && !buttons[buttons.length - 1].innerText.includes("Regenerate")) {
         buttons[buttons.length - 1].click();
         return false;
       }
