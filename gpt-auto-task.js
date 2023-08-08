@@ -3,9 +3,8 @@
 // @name              GPT Auto task
 // @author            Mark
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
-// @description       "snippetSourceData", "mock_prompt1", "mock_prompt2", "model_number" 四个localStorage变量用于存储数据
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.7
+// @version           0.1.8
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -17,7 +16,8 @@
   const tableName = "data";
 
   const dbTable = {
-    // tasks: idbKeyval.createStore("tasks", tableName),
+    tasks: idbKeyval.createStore("tasks", tableName),
+    config: idbKeyval.createStore("config", tableName),
     skipSnippet: idbKeyval.createStore("skipSnippet", tableName),
     response1: idbKeyval.createStore("response1", tableName),
     response2: idbKeyval.createStore("response2", tableName),
@@ -26,7 +26,7 @@
 
   const locationReload = () => {
     location.href = "https://chat.openai.com/?model=gpt-4";
-  }
+  };
 
   const downloadFile = (data, fileName) => {
     const a = document.createElement("a");
@@ -102,6 +102,30 @@
     return result;
   }
 
+  function readFile(accept = "", multiple = false) {
+    const inputEl = document.createElement("input");
+    inputEl.setAttribute("type", "file");
+    inputEl.setAttribute("accept", accept);
+    inputEl.setAttribute("multiple", !!multiple);
+    return new Promise((resolve, reject) => {
+      inputEl.addEventListener("change", (e) => {
+        resolve(multiple ? inputEl.files : inputEl.files[0]);
+        window.removeEventListener("click", onWindowClick, true);
+      });
+      inputEl.click();
+
+      const onWindowClick = () => {
+        if (!inputEl.value) {
+          reject(new Error("用户取消选择"));
+        }
+        window.removeEventListener("click", onWindowClick, true);
+      };
+      setTimeout(() => {
+        window.addEventListener("click", onWindowClick, true);
+      }, 100);
+    });
+  }
+
   class GPT_ASK_LOOP {
     queue = [];
     abstract = [];
@@ -110,8 +134,10 @@
     account = "";
     downloadBtn = null;
     retrying = false;
-    defaultMode = 2;
     lastSaveTime = 0;
+    prompt1 = "";
+    prompt2 = "";
+    modelNum = 1;
 
     INPUT_SELECTOR = "#prompt-textarea";
     SUBMIT_BTN_SELECTOR = "#prompt-textarea + button";
@@ -136,16 +162,42 @@
         this.downloadBtn = btnWrap.querySelector("button");
         this.downloadBtn.onclick = this.handleDownload.bind(this);
         document.body.appendChild(btnWrap);
+
         const btnWrapBackup = document.createElement("div");
         btnWrapBackup.innerHTML = `<button style="padding: 4px 8px;position: fixed;bottom: 30%;right: 8px;border-radius: 4px;background-color: #224466;color: #fff;">备份</button>`;
         const backupBtn = btnWrapBackup.querySelector("button");
         backupBtn.onclick = this.backUp.bind(this);
         document.body.appendChild(btnWrapBackup);
+
+        const btnWrapImport = document.createElement("div");
+        btnWrapImport.innerHTML = `<button style="padding: 4px 8px;position: fixed;bottom: 40%;right: 8px;border-radius: 4px;background-color: #224466;color: #fff;">导入</button>`;
+        const importBtn = btnWrapImport.querySelector("button");
+        importBtn.onclick = async () => {
+          if (
+            !window.confirm(
+              "The data in browser will be clear up. Please make sure you have to do this !!!"
+            )
+          ) {
+            return;
+          }
+          const file = await readFile(".json");
+          const reader = new FileReader();
+
+          reader.onload = (event) => {
+            const json = JSON.parse(event.target.result);
+            // console.log({json}, 'json')
+            this.importFromBackUp.bind(this)(json);
+          };
+
+          reader.readAsText(file);
+        };
+        document.body.appendChild(btnWrapImport);
         this.main();
       });
     }
 
     async initData() {
+      await this.legacyTaskInit();
       const skipSnippetKeys = await idbKeyval.keys(dbTable.skipSnippet);
       const responseKeys = await idbKeyval.keys(dbTable.responseProcessed);
       const responseValues = await idbKeyval.values(dbTable.responseProcessed);
@@ -154,9 +206,16 @@
         snippetId: item.snippetId,
         createdTime: item.createdTime,
       }));
-      const snippetSourceData = JSON.parse(
-        localStorage.getItem("snippetSourceData") || "[]"
-      );
+      const indexDBConfig = (await idbKeyval.entries(dbTable.config)) || [];
+      if (indexDBConfig.length) {
+        this.prompt1 = indexDBConfig.find((item) => item[0] === "prompt1");
+        this.prompt2 = indexDBConfig.find((item) => item[0] === "prompt2");
+        this.modelNum = indexDBConfig.find((item) => item[0] === "modelNum");
+        this.prompt1 = (this.prompt1 && this.prompt1[1]) || "";
+        this.prompt2 = (this.prompt2 && this.prompt2[1]) || "";
+        this.modelNum = (this.modelNum && this.modelNum[1]) || 1;
+      }
+      const snippetSourceData = (await idbKeyval.values(dbTable.tasks)) || [];
       this.abstract = snippetSourceData.filter(
         (item) => item.type == "abstract"
       );
@@ -176,23 +235,109 @@
       );
     }
 
+    async legacyTaskInit() {
+      const indexDBTasks = (await idbKeyval.entries(dbTable.tasks)) || [];
+      const indexDBConfig = (await idbKeyval.entries(dbTable.config)) || [];
+      if (indexDBConfig.length === 0) {
+        const prompt1 = localStorage.getItem("mock_prompt1");
+        const prompt2 = localStorage.getItem("mock_prompt2");
+        const modelNum = +localStorage.getItem("model_number") || 1;
+        if (!prompt1 || !prompt2) {
+          return;
+        }
+        await idbKeyval.setMany(
+          [
+            ["prompt1", prompt1],
+            ["prompt2", prompt2],
+            ["modelNum", modelNum],
+          ],
+          dbTable.config
+        );
+      }
+      if (indexDBTasks.length === 0) {
+        const snippetSourceData = JSON.parse(
+          localStorage.getItem("snippetSourceData") || "[]"
+        );
+        if (!snippetSourceData.length) {
+          return;
+        }
+        const snippetSourceDataEntries = snippetSourceData.map((item) => [
+          `${item.article_id}-${item.id}`,
+          item,
+        ]);
+        await idbKeyval.setMany(snippetSourceDataEntries, dbTable.tasks);
+      }
+    }
+
+    async importFromBackUp(data) {
+      const {
+        response1,
+        response2,
+        responseProcessed,
+        skipSnippet,
+        config,
+        tasks,
+      } = data;
+      if (
+        !(
+          response1 &&
+          response2 &&
+          responseProcessed &&
+          skipSnippet &&
+          config &&
+          tasks
+        )
+      ) {
+        alert(
+          `[ "response1", "response2", "responseProcessed", "skipSnippet", "config", "tasks" ], all of them are required`
+        );
+        return;
+      }
+      await idbKeyval.clear(dbTable.response1);
+      await idbKeyval.clear(dbTable.response2);
+      await idbKeyval.clear(dbTable.responseProcessed);
+      await idbKeyval.clear(dbTable.skipSnippet);
+      await idbKeyval.clear(dbTable.config);
+      await idbKeyval.clear(dbTable.tasks);
+      await idbKeyval.setMany(response1, dbTable.response1);
+      await idbKeyval.setMany(response2, dbTable.response2);
+      await idbKeyval.setMany(responseProcessed, dbTable.responseProcessed);
+      await idbKeyval.setMany(skipSnippet, dbTable.skipSnippet);
+      await idbKeyval.setMany(config, dbTable.config);
+      await idbKeyval.setMany(tasks, dbTable.tasks);
+    }
+
     async backUp() {
-      const response1 = await idbKeyval.entries(dbTable.response1);
-      const response2 = await idbKeyval.entries(dbTable.response2);
-      const responseProcessed = await idbKeyval.entries(dbTable.responseProcessed);
+      const response1 = (await idbKeyval.entries(dbTable.response1)) || [];
+      const response2 = (await idbKeyval.entries(dbTable.response2)) || [];
+      const responseProcessed =
+        (await idbKeyval.entries(dbTable.responseProcessed)) || [];
+      const skipSnippet = (await idbKeyval.entries(dbTable.skipSnippet)) || [];
+      const config = (await idbKeyval.entries(dbTable.config)) || [];
+      const tasks = (await idbKeyval.entries(dbTable.tasks)) || [];
+
+      const paragraphs = tasks.filter((item) => item[1].type != "abstract");
+
+      const articleIds = tasks.map((item) => item[1].article_id).sort();
 
       const now = new Date();
       const current = `${now.getFullYear()}-${
         now.getMonth() + 1
       }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}`;
       downloadFile(
-        JSON.stringify(response1), `backup-${current}-response1-${response1.length}.json`
-      );
-      downloadFile(
-        JSON.stringify(response2), `backup-${current}-response2-${response2.length}.json`
-      );
-      downloadFile(
-        JSON.stringify(responseProcessed), `backup-${current}-responseProcessed-${responseProcessed.length}.json`
+        JSON.stringify({
+          response1,
+          response2,
+          responseProcessed,
+          skipSnippet,
+          config,
+          tasks,
+        }),
+        `Article_${articleIds[0]}_${
+          articleIds[articleIds.length - 1]
+        }-progress_${paragraphs.length}_${
+          responseProcessed.length
+        }-${current}.backup.json`
       );
     }
 
@@ -240,17 +385,15 @@
 
     genPrompt(content, step = 1) {
       return step === 1
-        ? `${localStorage.getItem("mock_prompt" + step)}
+        ? `${this.prompt1}
   
               ''' ${content} ''' `
-        : localStorage.getItem("mock_prompt" + step);
+        : this.prompt2;
     }
 
-    _updateDownloadBtnText() {
+    async _updateDownloadBtnText() {
       if (this.downloadBtn) {
-        const snippetSourceData = JSON.parse(
-          localStorage.getItem("snippetSourceData") || "[]"
-        );
+        const snippetSourceData = (await idbKeyval.values(dbTable.tasks)) || [];
         const paragraphs = snippetSourceData.filter(
           (item) => item.type != "abstract"
         );
@@ -488,7 +631,10 @@
       }
       this.retrying = false;
       // 如果还未完全输出
-      if (buttons.length > 1 && !buttons[buttons.length - 1].innerText.includes("Regenerate")) {
+      if (
+        buttons.length > 1 &&
+        !buttons[buttons.length - 1].innerText.includes("Regenerate")
+      ) {
         buttons[buttons.length - 1].click();
         return false;
       }
@@ -498,9 +644,8 @@
     async main(sleepTime = 5000) {
       let emptyCount = 0;
       while (true) {
-        // {0: gpt-3.5, 1: gpt-4, 2: gpt-4 mobile}
-        const modelNum =
-          +localStorage.getItem("model_number") || this.defaultMode;
+        // {0: gpt-3.5, 1: gpt-4}
+        const modelNum = this.modelNum;
         const gpt4btn = document.querySelectorAll(
           "ul > li > button.cursor-pointer"
         )[modelNum];
@@ -514,7 +659,13 @@
           locationReload();
         }
         await this.sleep(sleepTime / 2);
-        if (modelNum === 1 && !(location.href.endsWith("gpt-4") || gpt4btn.firstChild.className?.includes("shadow"))) {
+        if (
+          modelNum === 1 &&
+          !(
+            location.href.endsWith("gpt-4") ||
+            gpt4btn.firstChild.className?.includes("shadow")
+          )
+        ) {
           console.log("未切换到gpt-4模式, 5分钟后重试");
           const maxTime = this._getLastRespondTime();
           const diff = new Date().valueOf() - maxTime;
