@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.9
+// @version           0.1.10
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -305,6 +305,7 @@
       await idbKeyval.setMany(skipSnippet, dbTable.skipSnippet);
       await idbKeyval.setMany(config, dbTable.config);
       await idbKeyval.setMany(tasks, dbTable.tasks);
+      locationReload();
     }
 
     async backUp() {
