@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.8
+// @version           0.1.9
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -361,7 +361,7 @@
       const now = new Date();
       downloadFile(
         JSON.stringify(reactions),
-        `${now.getFullYear()}-${
+        `${this.account}-${now.getFullYear()}-${
           now.getMonth() + 1
         }-${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}-${
           reactions.length
@@ -379,7 +379,7 @@
           tip: tip,
         }),
       }).catch((err) => {
-        console.error({ err });
+        // console.error({ err });
       });
     }
 
