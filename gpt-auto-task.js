@@ -4,7 +4,7 @@
 // @author            Mark
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.10
+// @version           0.1.11
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
@@ -233,6 +233,12 @@
       this.queue = paragraphs.filter((item) =>
         (skipSnippetKeys || []).includes(`${item.article_id}-${item.id}`)
       );
+      const skipSnippetEntries = await idbKeyval.entries(dbTable.skipSnippet);
+      this.queue.sort((a,b) => {
+        const aItem = skipSnippetEntries.find(item => item[0] === `${a.article_id}-${a.id}`)
+        const bItem = skipSnippetEntries.find(item => item[0] === `${b.article_id}-${b.id}`)
+        return aItem[1] < bItem[1] ? -1 : 1
+      })
     }
 
     async legacyTaskInit() {
