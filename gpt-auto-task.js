@@ -4,11 +4,13 @@
 // @author            Mark
 // @description       根据缓存中的数据自动在网页上与chat gpt对话
 // @homepageURL       https://github.com/IKKEM-Lin/gpt-auto-task
-// @version           0.1.11
+// @version           0.2.0
 // @match             *chat.openai.com/*
 // @run-at            document-idle
 // @require           https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
 // @require           https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js
+// @downloadURL https://update.greasyfork.org/scripts/469039/GPT%20Auto%20task.user.js
+// @updateURL https://update.greasyfork.org/scripts/469039/GPT%20Auto%20task.meta.js
 // ==/UserScript==
 (function () {
   "use strict";
@@ -140,9 +142,9 @@
     modelNum = 1;
 
     INPUT_SELECTOR = "#prompt-textarea";
-    SUBMIT_BTN_SELECTOR = "#prompt-textarea + button";
-    RESPOND_SELECTOR = "main .group.text-token-text-primary";
-    NEW_CHART_BTN_SELECTOR = "nav>div.mb-1>a:first-child";
+    SUBMIT_BTN_SELECTOR = 'button[data-testid="send-button"]';
+    RESPOND_SELECTOR = 'main div[data-message-author-role="assistant"]';
+    NEW_CHART_BTN_SELECTOR = "nav div.flex-col a[href='/']";
     NORMAL_RESPOND_BTN_SELECTOR = "form div button.btn-neutral";
     ERROR_RESPOND_BTN_SELECTOR = "form div button.btn-primary";
 
@@ -377,7 +379,7 @@
     }
 
     async report(tip = "") {
-      await fetch("https://gpt-hit.deno.dev/api/update", {
+      await fetch("http://localhost:3000", {
         method: "POST",
         body: JSON.stringify({
           account: this.account,
@@ -393,7 +395,7 @@
     genPrompt(content, step = 1) {
       return step === 1
         ? `${this.prompt1}
-  
+
               ''' ${content} ''' `
         : this.prompt2;
     }
@@ -446,7 +448,7 @@
         );
         const promptContent = `
                   ${relatedAbstract}
-  
+
                   ${content}
                   `;
         const prompt1 = this.genPrompt(promptContent, 1);
@@ -607,8 +609,10 @@
       const errorBtn = document.querySelectorAll(
         this.ERROR_RESPOND_BTN_SELECTOR
       );
+      const feedbackBtns = document.querySelectorAll('main .final-completion button[class*="final-completion"]')
+      const regenerateBtn = feedbackBtns[feedbackBtns.length - 1];
       // 如果触发gpt-4 3小时25次限制
-      if (!buttons[0] && !errorBtn[0] && innerHTML.includes("usage cap")) {
+      if (!regenerateBtn && !errorBtn[0] && innerHTML.includes("usage cap")) {
         console.error("触发gpt-4 3小时25次限制,等待10min后重试");
         await this.sleep(10 * 60 * 1000);
         throw new Error("触发gpt-4 3小时25次限制");
@@ -632,7 +636,7 @@
           throw new Error("未返回yaml结构");
         }
         console.error("未输出yaml结构，重试一次");
-        buttons[0].click();
+        regenerateBtn.click();
         this.retrying = true;
         return false;
       }
@@ -653,25 +657,23 @@
       while (true) {
         // {0: gpt-3.5, 1: gpt-4}
         const modelNum = this.modelNum;
-        const gpt4btn = document.querySelectorAll(
-          "ul > li > button.cursor-pointer"
-        )[modelNum];
+        // const gpt4btn = document.querySelectorAll(
+        //   "ul > li > button.cursor-pointer"
+        // )[modelNum];
 
-        if (gpt4btn) {
-          console.log(`当前模型为：${gpt4btn.innerText}`);
-          gpt4btn.firstChild.click();
-        } else {
-          console.warn(`无法选择模型，2分钟后刷新`);
-          await this.sleep(2 * 60 * 1000);
-          locationReload();
-        }
+        // if (gpt4btn) {
+        //   console.log(`当前模型为：${gpt4btn.innerText}`);
+        //   gpt4btn.firstChild.click();
+        // } else {
+        //   console.warn(`无法选择模型，2分钟后刷新`);
+        //   await this.sleep(2 * 60 * 1000);
+        //   locationReload();
+        // }
+        const currentModel = document.querySelector('main [aria-haspopup="menu"]')?.innerText;
+        const isGPT4 = currentModel.trim() === "ChatGPT 4"
         await this.sleep(sleepTime / 2);
         if (
-          modelNum === 1 &&
-          !(
-            location.href.endsWith("gpt-4") ||
-            gpt4btn.firstChild.className?.includes("shadow")
-          )
+          modelNum === 1 && !isGPT4
         ) {
           console.log("未切换到gpt-4模式, 5分钟后重试");
           const maxTime = this._getLastRespondTime();
